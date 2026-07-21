@@ -50,6 +50,10 @@ pub fn run_vz_scenario_with_log(
     // Diagnostic override for the daemon under test, e.g.
     // ARCBOX_E2E_DAEMON_LOG="info,splicetcp::tcp_bridge=debug".
     let rust_log = std::env::var("ARCBOX_E2E_DAEMON_LOG").unwrap_or_else(|_| rust_log.to_owned());
+    // Backend override: ARCBOX_E2E_BACKEND=hv reruns any scenario against
+    // the HV backend (default vz, the name notwithstanding) — e.g. the
+    // network-workload suite as the acceptance for HV datapath changes.
+    let backend = std::env::var("ARCBOX_E2E_BACKEND").unwrap_or_else(|_| "vz".to_owned());
 
     let root = crate::repo_root();
     if !crate::env_flag("SKIP_BUILD") {
@@ -79,13 +83,13 @@ pub fn run_vz_scenario_with_log(
         args: vec![],
         env: vec![
             ("ARCBOX_BOOT_ASSET_VERSION".to_owned(), version),
-            ("ARCBOX_VM_BACKEND".to_owned(), "vz".to_owned()),
+            ("ARCBOX_VM_BACKEND".to_owned(), backend.clone()),
             ("ARCBOX_DNS_PORT".to_owned(), dns_port.to_string()),
             ("RUST_LOG".to_owned(), rust_log),
         ],
     })?;
 
-    let mut metrics = RunMetrics::new(name, Some("vz"));
+    let mut metrics = RunMetrics::new(name, Some(&backend));
     let result = scenario(&mut daemon, data_dir.path(), &mut metrics);
     metrics.passed = result.is_ok();
     if let Err(error) = metrics.write(Some(data_dir.path())) {
